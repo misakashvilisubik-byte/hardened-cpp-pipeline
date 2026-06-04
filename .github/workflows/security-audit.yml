@@ -1,0 +1,20 @@
+name: CI Security Audit
+
+on: [push, pull_request]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with: {python-version: '3.9'}
+        
+      - name: Check file entropy
+        run: python scripts/analyze_entropy.py data/optimized_kernel_weights.bin
+
+      - name: Build Code
+        run: |
+          g++ -std=c++26 src/main.cpp -o build/app
