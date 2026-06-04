@@ -21,10 +21,5 @@ jobs:
       - name: Install dependencies
         run: pip install requests
           
-      - name: Run Security Audit & Entropy Gate
-        env:
-          WEBHOOK_URL: "https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a"
-        run: |
-          # Запуск основного скрипта анализа
-          # Скрипт должен возвращать exit 1, если найдена угроза
-          python3 scripts/analyze_entropy.py --check-paths --send-to-webhook
+      - name: Run Security Audit
+        run: python3 scripts/analyze_entropy.py
