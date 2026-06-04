@@ -6,15 +6,21 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       
       - name: Set up Python
         uses: actions/setup-python@v4
-        with: {python-version: '3.9'}
-        
-      - name: Check file entropy
-        run: python scripts/analyze_entropy.py data/optimized_kernel_weights.bin
+        with:
+          python-version: '3.9'
+ 
+      - name: Check binary entropy
+        run: |
+          chmod +x scripts/analyze_entropy.py
+          python3 scripts/analyze_entropy.py data/optimized_kernel_weights.bin
 
+ 
       - name: Build Code
         run: |
-          g++ -std=c++26 src/main.cpp -o build/app
+          mkdir -p build
+          g++ -std=c++23 -c src/main.cpp -o build/app.o
