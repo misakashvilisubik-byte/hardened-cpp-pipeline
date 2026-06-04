@@ -1,43 +1,39 @@
-import os
-import subprocess
-import requests
+import random
 import sys
-import time
 
-# Функция для вычисления (простой тест на простоту числа)
-def is_prime(n):
+# Используем мощный метод проверки Миллера-Рабина
+def is_prime(n, k=5): # k - количество тестов, чем больше, тем точнее
     if n < 2: return False
-    for i in range(2, int(n**0.5) + 1):
-        if n % i == 0: return False
+    for p in [2, 3, 5, 7, 11, 13, 17, 19, 23]:
+        if n % p == 0: return n == p
+    
+    # Тест Миллера-Рабина
+    d = n - 1
+    s = 0
+    while d % 2 == 0:
+        d //= 2
+        s += 1
+    for _ in range(k):
+        a = random.randrange(2, n - 1)
+        x = pow(a, d, n)
+        if x == 1 or x == n - 1:
+            continue
+        for _ in range(s - 1):
+            x = pow(x, 2, n)
+            if x == n - 1:
+                break
+        else:
+            return False
     return True
 
-def run_benchmark():
-    # 1. Сбор системных данных
-    cpu_info = subprocess.getoutput("cat /proc/cpuinfo | grep 'model name' | head -n 1")
-    mem_info = subprocess.getoutput("grep MemTotal /proc/meminfo")
-    
-    # 2. Вычисления (например, поиск простых чисел до 50,000)
-    start_time = time.time()
-    count = 0
-    for i in range(2, 50000):
-        if is_prime(i):
-            count += 1
-    end_time = time.time()
-    
-    report = {
-        "cpu": cpu_info,
-        "mem": mem_info,
-        "primes_found": count,
-        "calculation_time": f"{end_time - start_time:.4f}s"
-    }
-    
-    # Отправка на вебхук
-    try:
-        requests.post("https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a", json=report)
-    except:
-        pass
-    
-    print(f"Benchmark finished: {count} primes in {end_time - start_time:.4f}s")
+# Генерируем число из 10 000 цифр
+digits = 10000
+# Первая цифра не должна быть нулем, последняя должна быть нечетной
+large_num = random.randint(10**(digits-1), 10**digits)
+if large_num % 2 == 0: large_num += 1
 
-if __name__ == "__main__":
-    run_benchmark()
+print(f"Checking if {digits}-digit number is prime...")
+if is_prime(large_num):
+    print("Found a probable prime!")
+else:
+    print("Not prime.")
