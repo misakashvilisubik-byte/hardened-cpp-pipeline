@@ -1,24 +1,29 @@
-name: CI Security Audit
+name: Site Security Scanner
 
-on: 
+on:
+  workflow_dispatch:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [ "main", "master" ]
 
 jobs:
-  security-audit:
+  security-scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
-      
+
+      # ВАЖНО: Этот шаг устанавливает nmap в окружение раннера, чтобы не было ошибки "No such file"
+      - name: Install System Dependencies (Nmap)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
-          
-      - name: Install dependencies
+          python-version: '3.11'
+
+      - name: Install Python Dependencies
         run: pip install requests
           
       - name: Run Security Audit
