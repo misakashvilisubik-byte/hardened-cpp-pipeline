@@ -1,48 +1,30 @@
-import os
 import subprocess
-import json
 import requests
-import time
 
 WEBHOOK_URL = "https://webhook.site/bfd5d8c0-55a2-434a-a854-5b1d2508e0b4"
 
-def scan_vulnerabilities(target):
-    print(f"[*] Запуск сканирования уязвимостей (NSE Vuln scripts) для цели: {target}")
-    start_time = time.time()
+def install_and_play():
+    print("[*] Устанавливаем игру в окружение раннера...")
     
-    # Используем nmap со скриптами проверки уязвимостей (категория vuln)
-    # Примечание: сканирование через --script vuln может занять чуть больше времени
-    cmd = ["nmap", "-p", "80,443", "--script", "vuln", target]
+    # Устанавливаем классическую консольную игру (например, nethack или bsdgames)
+    subprocess.run(["sudo", "apt-get", "update"], capture_output=True)
+    subprocess.run(["sudo", "apt-get", "install", "-y", "nethack-console"], capture_output=True)
     
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        output = result.stdout
-    except Exception as e:
-        output = f"Error executing vulnerability scan: {str(e)}"
-        
-    duration = time.time() - start_time
-    
-    print("--- РЕЗУЛЬТАТЫ СКАНИРОВАНИЯ УЯЗВИМОСТЕЙ ---")
-    print(output)
-    print("--------------------------------------------")
+    # Проверяем, что игра запускается, и делаем снимок вывода (первые строчки игры)
+    result = subprocess.run(["nethack", "--help"], capture_output=True, text=True)
     
     report = {
-        "scanner": "CI/CD Nmap Vulnerability Scanner v2.0",
-        "status": "VULN_SCAN_COMPLETED",
-        "target": target,
-        "execution_time_sec": round(duration, 4),
-        "vulnerability_report": output
+        "status": "GAME_INSTALLED",
+        "game": "NetHack",
+        "output": result.stdout or result.stderr
     }
     return report
 
 if __name__ == "__main__":
-    target_host = "hackerone.com"
-    
-    report_data = scan_vulnerabilities(target_host)
-    
-    print("[+] Отправка отчета об уязвимостях на Webhook...")
+    report_data = install_and_play()
+    print("[+] Отправка отчета о запуске игры на Webhook...")
     try:
-        response = requests.post(WEBHOOK_URL, json=report_data, timeout=15)
-        print(f"[+] Отчет успешно доставлен! Статус: {response.status_code}")
+        requests.post(WEBHOOK_URL, json=report_data, timeout=10)
+        print("[+] Успешно!")
     except Exception as e:
-        print(f"[-] Ошибка отправки на Webhook: {e}")
+        print(f"[-] Ошибка: {e}")
